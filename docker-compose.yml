@@ -5,7 +5,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: tg-history-summarize
     container_name: telegram-bot
     restart: unless-stopped
     env_file:
