@@ -34,3 +34,6 @@ build/
 *.swp
 *.swo
 .DS_Store
+
+# ESLint/Prettier
+.eslintcache

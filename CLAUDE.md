@@ -1,6 +1,7 @@
 # CLAUDE.md - Telegram History Summarizer
 
 ## Commands
+
 - Start: `npm start` or `node main.js`
 - Development with auto-reload: `npm run dev`
 - Install dependencies: `npm install`
@@ -8,6 +9,7 @@
 - Add dev dependency: `npm install --save-dev <dependency-name>`
 
 ## Code Style Guidelines
+
 - Module system: ESM (import/export) not CommonJS (require)
 - Use camelCase for variables and functions
 - Use PascalCase for classes and constructors
@@ -19,6 +21,7 @@
 - Environment variables: Load from .env file using dotenv
 
 ## Project Structure
+
 - Single file application with modular functions
 - Telegram bot uses Telegraf framework
 - API client uses Telegram/TelegramClient library

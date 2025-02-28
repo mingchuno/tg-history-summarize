@@ -4,7 +4,6 @@ import { TelegramClient } from 'telegram';
 import { StringSession } from 'telegram/sessions/StringSession.js';
 import { OpenAI } from 'openai';
 import input from 'input';
-import { NewMessage } from 'telegram/events/NewMessage.js';
 import moment from 'moment';
 
 // Configure environment variables
@@ -12,29 +11,25 @@ const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || 'your_bot_token_her
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || 'your_openai_api_key_here';
 const API_ID = parseInt(process.env.TELEGRAM_API_ID || '0');
 const API_HASH = process.env.TELEGRAM_API_HASH || 'your_api_hash_here';
-const BOT_USERNAME = process.env.BOT_USERNAME || 'your_bot_username_here';
 const SESSION_STRING = process.env.SESSION_STRING || '';
 
 // Set up OpenAI client
 const openai = new OpenAI({
-  apiKey: OPENAI_API_KEY
+  apiKey: OPENAI_API_KEY,
 });
 
 // Initialize Telegram bot
 const bot = new Telegraf(TELEGRAM_BOT_TOKEN);
 
 // Telethon client for accessing chat history
-const client = new TelegramClient(
-  new StringSession(SESSION_STRING),
-  API_ID,
-  API_HASH,
-  { connectionRetries: 5 }
-);
+const client = new TelegramClient(new StringSession(SESSION_STRING), API_ID, API_HASH, {
+  connectionRetries: 5,
+});
 
 // Setup logging
 const logger = {
-  info: (message) => console.log(`[INFO] ${message}`),
-  error: (message) => console.error(`[ERROR] ${message}`)
+  info: message => console.log(`[INFO] ${message}`),
+  error: message => console.error(`[ERROR] ${message}`),
 };
 
 /**
@@ -45,7 +40,7 @@ async function startTelegramClient() {
     phoneNumber: async () => await input.text('Please enter your phone number: '),
     password: async () => await input.text('Please enter your password: '),
     phoneCode: async () => await input.text('Please enter the code you received: '),
-    onError: (err) => logger.error(`Error starting Telegram client: ${err}`)
+    onError: err => logger.error(`Error starting Telegram client: ${err}`),
   });
 
   // Save the session string to reuse it later
@@ -57,13 +52,13 @@ async function startTelegramClient() {
  */
 async function listAllDialogs() {
   try {
-    const dialogs = await client.getDialogs({limit:10});
+    const dialogs = await client.getDialogs({ limit: 10 });
     return dialogs.map(dialog => ({
       id: dialog.entity.id.toString(),
       name: dialog.entity.title || dialog.entity.firstName || 'Unknown',
       type: dialog.entity.className || 'Unknown',
-      username: dialog.entity.username || 'N/A'
-    }))
+      username: dialog.entity.username || 'N/A',
+    }));
   } catch (error) {
     logger.error(`Error listing dialogs: ${error}`);
     return [];
@@ -120,7 +115,9 @@ async function getChatHistory(groupIdentifier, hours = 48) {
                 entity = await client.getInputEntity({ userId: id });
               } catch (e3) {
                 logger.error(`Failed to resolve entity for ID: ${groupIdentifier}`);
-                throw new Error(`Could not find entity with ID: ${groupIdentifier}. Please make sure the ID is correct and you have access to it.`);
+                throw new Error(
+                  `Could not find entity with ID: ${groupIdentifier}. Please make sure the ID is correct and you have access to it.`
+                );
               }
             }
           }
@@ -148,11 +145,12 @@ async function getChatHistory(groupIdentifier, hours = 48) {
         break;
       }
 
-      if (message.message) {  // Only include messages with text
+      if (message.message) {
+        // Only include messages with text
         messages.push({
           sender: message.senderId ? message.senderId.toString() : 'Unknown',
           text: message.message,
-          date: messageDate.format('YYYY-MM-DD HH:mm:ss')
+          date: messageDate.format('YYYY-MM-DD HH:mm:ss'),
         });
       }
     }
@@ -169,11 +167,13 @@ async function getChatHistory(groupIdentifier, hours = 48) {
  */
 async function summarizeText(messages) {
   if (!messages || messages.length === 0) {
-    return "No messages found in the specified time period.";
+    return 'No messages found in the specified time period.';
   }
 
   // Format messages for the prompt
-  const formattedMessages = messages.map(msg => `${msg.date} - ${msg.sender}: ${msg.text}`).join('\n');
+  const formattedMessages = messages
+    .map(msg => `${msg.date} - ${msg.sender}: ${msg.text}`)
+    .join('\n');
 
   // Create the prompt for OpenAI
   const prompt = `
@@ -190,12 +190,16 @@ async function summarizeText(messages) {
   try {
     // Get summary from OpenAI
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",  // Or any suitable model
+      model: 'gpt-4o', // Or any suitable model
       messages: [
-        { role: "system", content: "You are a helpful assistant that summarizes Telegram chat histories concisely and accurately." },
-        { role: "user", content: prompt }
+        {
+          role: 'system',
+          content:
+            'You are a helpful assistant that summarizes Telegram chat histories concisely and accurately.',
+        },
+        { role: 'user', content: prompt },
       ],
-      max_tokens: 1000
+      max_tokens: 1000,
     });
 
     return response.choices[0].message.content;
@@ -206,30 +210,32 @@ async function summarizeText(messages) {
 }
 
 // Define bot commands
-bot.start((ctx) => {
+bot.start(ctx => {
   const user = ctx.from;
-  ctx.reply(`Hi ${user.first_name}! I'm a chat summary bot. Use /summarize [group_link] to get a summary of the last 48 hours in that group.`);
-});
-
-bot.help((ctx) => {
   ctx.reply(
-    "Commands:\n" +
-    "/start - Start the bot\n" +
-    "/help - Show this help message\n" +
-    "/list - List all your chats, channels and groups\n" +
-    "/summarize [group_link_or_id] - Summarize the last 48 hours of chat in the specified group"
+    `Hi ${user.first_name}! I'm a chat summary bot. Use /summarize [group_link] to get a summary of the last 48 hours in that group.`
   );
 });
 
-bot.command('list', async (ctx) => {
+bot.help(ctx => {
+  ctx.reply(
+    'Commands:\n' +
+      '/start - Start the bot\n' +
+      '/help - Show this help message\n' +
+      '/list - List all your chats, channels and groups\n' +
+      '/summarize [group_link_or_id] - Summarize the last 48 hours of chat in the specified group'
+  );
+});
+
+bot.command('list', async ctx => {
   // Let the user know the bot is working
-  ctx.reply("Fetching your chats, channels, and groups. This may take a moment...");
+  ctx.reply('Fetching your chats, channels, and groups. This may take a moment...');
 
   try {
     // Get all dialogs
     const dialogs = await listAllDialogs();
 
-    console.log(dialogs)
+    console.log(dialogs);
     // Check if we got any dialogs
     if (!dialogs.length) {
       ctx.reply("Could not retrieve any chats. Please ensure you're logged in properly.");
@@ -237,27 +243,30 @@ bot.command('list', async (ctx) => {
     }
 
     // Format dialogs for display with a limit to avoid message length issues
-    const formattedMessage = "Your chats, channels and groups:\n\n";
+    const formattedMessage = 'Your chats, channels and groups:\n\n';
 
-    const formattedChunk = dialogs.map(dialog =>
-      `ID: \`${dialog.id}\`\nName: ${dialog.name}\nType: ${dialog.type}\nUsername: ${dialog.username}\n`
-    ).join('\n');
+    const formattedChunk = dialogs
+      .map(
+        dialog =>
+          `ID: \`${dialog.id}\`\nName: ${dialog.name}\nType: ${dialog.type}\nUsername: ${dialog.username}\n`
+      )
+      .join('\n');
 
     await ctx.reply(`${formattedMessage}${formattedChunk}`);
 
     // Add instructions for using the IDs
-    await ctx.reply("To summarize a chat, use /summarize [ID] with one of the IDs listed above.");
+    await ctx.reply('To summarize a chat, use /summarize [ID] with one of the IDs listed above.');
   } catch (error) {
     logger.error(`Error processing list command: ${error}`);
     ctx.reply(`Error: ${error.message}`);
   }
 });
 
-bot.command('summarize', async (ctx) => {
+bot.command('summarize', async ctx => {
   const args = ctx.message.text.split(' ').slice(1);
 
   if (!args.length) {
-    ctx.reply("Please provide a group link or ID. Usage: /summarize [group_link_or_id]");
+    ctx.reply('Please provide a group link or ID. Usage: /summarize [group_link_or_id]');
     return;
   }
 
@@ -272,7 +281,9 @@ bot.command('summarize', async (ctx) => {
 
     // Check if we got any messages
     if (!messages.length) {
-      ctx.reply("Could not retrieve any messages. Please check the group link/ID and ensure the bot has access to the group.");
+      ctx.reply(
+        'Could not retrieve any messages. Please check the group link/ID and ensure the bot has access to the group.'
+      );
       return;
     }
 
@@ -281,7 +292,7 @@ bot.command('summarize', async (ctx) => {
 
     // Send summary to the user
     ctx.reply(`Summary of the last 48 hours in the group:\n\n${summary}`, {
-      parse_mode: 'Markdown'
+      parse_mode: 'Markdown',
     });
   } catch (error) {
     logger.error(`Error processing summarize command: ${error}`);
