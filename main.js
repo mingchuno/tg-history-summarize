@@ -75,24 +75,70 @@ async function listAllDialogs() {
  */
 async function getChatHistory(groupIdentifier, hours = 48) {
   try {
-    // Determine if the identifier is a link or ID
-    let channel;
+    logger.info(`Getting chat history for: ${groupIdentifier}`);
+
+    // Determine if the identifier is a link, username, or ID
+    let entity;
+
     if (groupIdentifier.startsWith('https://t.me/') || groupIdentifier.startsWith('@')) {
       // It's a link or username
-      channel = await client.getEntity(groupIdentifier);
+      entity = await client.getInputEntity(groupIdentifier);
     } else {
-      // It's a channel ID
-      channel = await client.getEntity(BigInt(groupIdentifier));
+      // It's a numeric ID - convert to BigInt
+      let id;
+      try {
+        id = BigInt(groupIdentifier);
+      } catch (error) {
+        logger.error(`Invalid ID format: ${groupIdentifier}`);
+        throw new Error(`Invalid ID format: ${groupIdentifier}. Please use a valid numeric ID.`);
+      }
+
+      // For debugging
+      logger.info(`Attempting to resolve entity with ID: ${id}`);
+
+      // Try different entity types and formats
+      try {
+        // First, try to get the entity directly from dialogs
+        const dialogs = await client.getDialogs();
+        for (const dialog of dialogs) {
+          if (dialog.entity.id.toString() === groupIdentifier) {
+            entity = dialog.inputEntity;
+            logger.info(`Found entity in dialogs with ID: ${groupIdentifier}`);
+            break;
+          }
+        }
+
+        // If not found in dialogs, try other methods
+        if (!entity) {
+          try {
+            entity = await client.getInputEntity({ channelId: id });
+          } catch (e1) {
+            try {
+              entity = await client.getInputEntity({ chatId: id });
+            } catch (e2) {
+              try {
+                entity = await client.getInputEntity({ userId: id });
+              } catch (e3) {
+                logger.error(`Failed to resolve entity for ID: ${groupIdentifier}`);
+                throw new Error(`Could not find entity with ID: ${groupIdentifier}. Please make sure the ID is correct and you have access to it.`);
+              }
+            }
+          }
+        }
+      } catch (error) {
+        logger.error(`Error during entity resolution: ${error.message}`);
+        throw error;
+      }
     }
 
-    logger.info(channel)
+    logger.info(`Successfully resolved entity`);
 
     // Calculate the time threshold as a moment object
     const timeThreshold = moment().subtract(hours, 'hours');
 
     // Get messages from the specified time period
     const messages = [];
-    const messagesIterator = client.iterMessages(BigInt(groupIdentifier), { limit: 2000 });
+    const messagesIterator = client.iterMessages(entity, { limit: 1000 });
 
     for await (const message of messagesIterator) {
       // Convert Telegram date (milliseconds) to moment for comparison
