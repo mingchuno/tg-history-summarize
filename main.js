@@ -5,6 +5,7 @@ import { StringSession } from 'telegram/sessions/StringSession.js';
 import { OpenAI } from 'openai';
 import input from 'input';
 import moment from 'moment';
+import pino from 'pino';
 
 // Configure environment variables
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || 'your_bot_token_here';
@@ -26,11 +27,18 @@ const client = new TelegramClient(new StringSession(SESSION_STRING), API_ID, API
   connectionRetries: 5,
 });
 
-// Setup logging
-const logger = {
-  info: message => console.log(`[INFO] ${message}`),
-  error: message => console.error(`[ERROR] ${message}`),
-};
+// Setup logging with Pino
+const logger = pino({
+  transport: {
+    target: 'pino-pretty',
+    options: {
+      colorize: true,
+      translateTime: 'SYS:standard',
+      ignore: 'pid,hostname',
+    },
+  },
+  level: process.env.LOG_LEVEL || 'info',
+});
 
 /**
  * Start the Telegram client
@@ -44,7 +52,7 @@ async function startTelegramClient() {
   });
 
   // Save the session string to reuse it later
-  logger.info(`Session string: ${client.session.save()}`);
+  // logger.info(`Session string: ${client.session.save()}`);
 }
 
 /**
