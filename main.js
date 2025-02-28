@@ -48,6 +48,46 @@ async function startTelegramClient() {
 }
 
 /**
+ * Get the ID of the currently logged-in Telegram user
+ */
+async function getLoggedInUserId() {
+  try {
+    const me = await client.getMe();
+    return me.id.toString();
+  } catch (error) {
+    logger.error(`Error getting logged-in user: ${error}`);
+    return null;
+  }
+}
+
+/**
+ * Check if the bot context user is the same as the logged-in Telegram user
+ * @param {Object} ctx - The Telegraf context object
+ * @param {string} commandName - The name of the command being checked
+ * @returns {Promise<boolean>} - True if authorized, false otherwise
+ */
+async function isAuthorizedUser(ctx, commandName) {
+  // Get the bot context user ID (user who sent the command)
+  const botContextUserId = ctx.from.id.toString();
+
+  // Get the logged-in Telegram client user ID
+  const loggedInUserId = await getLoggedInUserId();
+
+  // Check if the IDs match
+  if (botContextUserId !== loggedInUserId) {
+    ctx.reply(
+      `Error: You are not authorized to use this command. Only the account owner can ${commandName}.`
+    );
+    logger.info(
+      `Unauthorized ${commandName} attempt by user ${botContextUserId}. Logged-in user is ${loggedInUserId}`
+    );
+    return false;
+  }
+
+  return true;
+}
+
+/**
  * List all dialogs (chats, channels, groups) that the user is part of
  */
 async function listAllDialogs() {
@@ -208,6 +248,11 @@ bot.help(ctx => {
 });
 
 bot.command('list', async ctx => {
+  // Check if user is authorized
+  if (!(await isAuthorizedUser(ctx, 'list chats'))) {
+    return;
+  }
+
   // Let the user know the bot is working
   ctx.reply('Fetching your chats, channels, and groups. This may take a moment...');
 
@@ -249,6 +294,11 @@ bot.command('summarize', async ctx => {
     return;
   }
 
+  // Check if user is authorized
+  if (!(await isAuthorizedUser(ctx, 'summarize chats'))) {
+    return;
+  }
+
   const groupIdentifier = args[0];
 
   // Let the user know the bot is working
@@ -270,9 +320,12 @@ bot.command('summarize', async ctx => {
     const summary = await summarizeText(messages);
 
     // Send summary to the user
-    ctx.reply(`Summary of the last ${MAX_CHAT_HISTORY_HOURS} hours or last ${MAX_CHAT_HISTORY_LIMIT} messages in the group:\n\n${summary}`, {
-      parse_mode: 'Markdown',
-    });
+    ctx.reply(
+      `Summary of the last ${MAX_CHAT_HISTORY_HOURS} hours or last ${MAX_CHAT_HISTORY_LIMIT} messages in the group:\n\n${summary}`,
+      {
+        parse_mode: 'Markdown',
+      }
+    );
   } catch (error) {
     logger.error(`Error processing summarize command: ${error}`);
     ctx.reply(`Error: ${error.message}`);
