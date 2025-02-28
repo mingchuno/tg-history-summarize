@@ -65,10 +65,13 @@ async function listAllDialogs() {
   }
 }
 
+const MAX_CHAT_HISTORY_HOURS = 48;
+const MAX_CHAT_HISTORY_LIMIT = 1000;
+
 /**
  * Get chat history from a group for the specified number of hours
  */
-async function getChatHistory(groupIdentifier, hours = 48) {
+async function getChatHistory(groupIdentifier) {
   try {
     logger.info(`Getting chat history for: ${groupIdentifier}`);
 
@@ -103,24 +106,10 @@ async function getChatHistory(groupIdentifier, hours = 48) {
           }
         }
 
-        // If not found in dialogs, try other methods
         if (!entity) {
-          try {
-            entity = await client.getInputEntity({ channelId: id });
-          } catch (e1) {
-            try {
-              entity = await client.getInputEntity({ chatId: id });
-            } catch (e2) {
-              try {
-                entity = await client.getInputEntity({ userId: id });
-              } catch (e3) {
-                logger.error(`Failed to resolve entity for ID: ${groupIdentifier}`);
-                throw new Error(
-                  `Could not find entity with ID: ${groupIdentifier}. Please make sure the ID is correct and you have access to it.`
-                );
-              }
-            }
-          }
+          throw new Error(
+            `Could not find entity with ID: ${groupIdentifier}. Please make sure the ID is correct and you have access to it.`
+          );
         }
       } catch (error) {
         logger.error(`Error during entity resolution: ${error.message}`);
@@ -131,31 +120,22 @@ async function getChatHistory(groupIdentifier, hours = 48) {
     logger.info(`Successfully resolved entity`);
 
     // Calculate the time threshold as a moment object
-    const timeThreshold = moment().subtract(hours, 'hours');
+    const timeThreshold = moment().subtract(MAX_CHAT_HISTORY_HOURS, 'hours');
 
     // Get messages from the specified time period
-    const messages = [];
-    const messagesIterator = client.iterMessages(entity, { limit: 1000 });
+    const messages = await client.getMessages(entity, { limit: MAX_CHAT_HISTORY_LIMIT });
 
-    for await (const message of messagesIterator) {
-      // Convert Telegram date (milliseconds) to moment for comparison
-      const messageDate = moment(message.date * 1000); // Convert seconds to milliseconds
-      // Compare using moment's isBefore method
-      if (messageDate.isBefore(timeThreshold)) {
-        break;
-      }
-
-      if (message.message) {
-        // Only include messages with text
-        messages.push({
-          sender: message.senderId ? message.senderId.toString() : 'Unknown',
-          text: message.message,
-          date: messageDate.format('YYYY-MM-DD HH:mm:ss'),
-        });
-      }
-    }
-
-    return messages;
+    return messages
+      .filter(message => message.message)
+      .filter(message => {
+        const messageDate = moment(message.date * 1000); // Convert seconds to milliseconds
+        return messageDate.isAfter(timeThreshold);
+      })
+      .map(message => ({
+        sender: message.senderId ? message.senderId.toString() : 'Unknown',
+        text: message.message,
+        date: moment(message.date * 1000).format('YYYY-MM-DD HH:mm:ss'),
+      }));
   } catch (error) {
     logger.error(`Error getting chat history: ${error}`);
     return [];
@@ -177,7 +157,7 @@ async function summarizeText(messages) {
 
   // Create the prompt for OpenAI
   const prompt = `
-    請總結過去48小時的Telegram聊天記錄。請用中文回應。
+    請總結以下的Telegram聊天記錄。請用中文回應。
     重點：
       - 主要討論主題
       - 關鍵決定或結論
@@ -193,7 +173,7 @@ async function summarizeText(messages) {
       model: 'gpt-4o', // Or any suitable model
       messages: [
         {
-          role: 'system',
+          role: 'developer',
           content:
             'You are a helpful assistant that summarizes Telegram chat histories concisely and accurately.',
         },
@@ -223,7 +203,7 @@ bot.help(ctx => {
       '/start - Start the bot\n' +
       '/help - Show this help message\n' +
       '/list - List all your chats, channels and groups\n' +
-      '/summarize [group_link_or_id] - Summarize the last 48 hours of chat in the specified group'
+      `/summarize [group_link_or_id] - Summarize the last ${MAX_CHAT_HISTORY_HOURS} hours or last ${MAX_CHAT_HISTORY_LIMIT} messages of chat in the specified group`
   );
 });
 
@@ -235,7 +215,6 @@ bot.command('list', async ctx => {
     // Get all dialogs
     const dialogs = await listAllDialogs();
 
-    console.log(dialogs);
     // Check if we got any dialogs
     if (!dialogs.length) {
       ctx.reply("Could not retrieve any chats. Please ensure you're logged in properly.");
@@ -291,7 +270,7 @@ bot.command('summarize', async ctx => {
     const summary = await summarizeText(messages);
 
     // Send summary to the user
-    ctx.reply(`Summary of the last 48 hours in the group:\n\n${summary}`, {
+    ctx.reply(`Summary of the last ${MAX_CHAT_HISTORY_HOURS} hours or last ${MAX_CHAT_HISTORY_LIMIT} messages in the group:\n\n${summary}`, {
       parse_mode: 'Markdown',
     });
   } catch (error) {
