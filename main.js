@@ -32,7 +32,7 @@ const logger = pino({
   transport: {
     target: 'pino-pretty',
     options: {
-      colorize: true,
+      colorize: process.env.NODE_ENV !== 'production',
       translateTime: 'SYS:standard',
       ignore: 'pid,hostname',
     },
