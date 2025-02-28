@@ -172,7 +172,7 @@ async function getChatHistory(groupIdentifier) {
         return messageDate.isAfter(timeThreshold);
       })
       .map(message => ({
-        sender: message.senderId ? message.senderId.toString() : 'Unknown',
+        sender: message.sender?.username || 'Unknown',
         text: message.message,
         date: moment(message.date * 1000).format('YYYY-MM-DD HH:mm:ss'),
       }));
@@ -197,12 +197,11 @@ async function summarizeText(messages) {
 
   // Create the prompt for OpenAI
   const prompt = `
-    請總結以下的Telegram聊天記錄。請用中文回應。
+    請總結以下的Telegram聊天記錄並使用中文回應。不少於500字。
     重點：
       - 主要討論主題
-      - 關鍵決定或結論
-      - 提出的重要問題或議題
-      - 提及的任何行動項目或後續行動
+      - 關鍵決定或結論，提及的任何行動項目或後續行動
+      - 誰人參與了這些討論，由參與度高到低排序
     聊天記錄：
     ${formattedMessages}
   `;
@@ -272,7 +271,7 @@ bot.command('list', async ctx => {
     const formattedChunk = dialogs
       .map(
         dialog =>
-          `ID: \`${dialog.id}\`\nName: ${dialog.name}\nType: ${dialog.type}\nUsername: ${dialog.username}\n`
+          `ID: ${dialog.id}\nName: ${dialog.name}\nType: ${dialog.type}\nUsername: ${dialog.username}\n`
       )
       .join('\n');
 
@@ -321,10 +320,7 @@ bot.command('summarize', async ctx => {
 
     // Send summary to the user
     ctx.reply(
-      `Summary of the last ${MAX_CHAT_HISTORY_HOURS} hours or last ${MAX_CHAT_HISTORY_LIMIT} messages in the group:\n\n${summary}`,
-      {
-        parse_mode: 'Markdown',
-      }
+      `Summary of the last ${MAX_CHAT_HISTORY_HOURS} hours or last ${MAX_CHAT_HISTORY_LIMIT} messages in the group:\n\n${summary}`
     );
   } catch (error) {
     logger.error(`Error processing summarize command: ${error}`);
