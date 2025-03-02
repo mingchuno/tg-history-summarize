@@ -14,6 +14,10 @@ const API_ID = parseInt(process.env.TELEGRAM_API_ID || '0');
 const API_HASH = process.env.TELEGRAM_API_HASH || 'your_api_hash_here';
 const SESSION_STRING = process.env.SESSION_STRING || '';
 
+// App constant
+const MAX_CHAT_HISTORY_HOURS = 24;
+const MAX_CHAT_HISTORY_LIMIT = 500;
+
 // Set up OpenAI client
 const openai = new OpenAI({
   apiKey: OPENAI_API_KEY,
@@ -113,15 +117,18 @@ async function listAllDialogs() {
   }
 }
 
-const MAX_CHAT_HISTORY_HOURS = 48;
-const MAX_CHAT_HISTORY_LIMIT = 1000;
-
 /**
  * Get chat history from a group for the specified number of hours
  */
-async function getChatHistory(groupIdentifier) {
+async function getChatHistory(
+  groupIdentifier,
+  hours = MAX_CHAT_HISTORY_HOURS,
+  messageLimit = MAX_CHAT_HISTORY_LIMIT
+) {
   try {
-    logger.info(`Getting chat history for: ${groupIdentifier}`);
+    logger.info(
+      `Getting chat history for: ${groupIdentifier} (last ${hours} hours, max ${messageLimit} messages)`
+    );
 
     // Determine if the identifier is a link, username, or ID
     let entity;
@@ -168,10 +175,10 @@ async function getChatHistory(groupIdentifier) {
     logger.info(`Successfully resolved entity`);
 
     // Calculate the time threshold as a moment object
-    const timeThreshold = moment().subtract(MAX_CHAT_HISTORY_HOURS, 'hours');
+    const timeThreshold = moment().subtract(hours, 'hours');
 
-    // Get messages from the specified time period
-    const messages = await client.getMessages(entity, { limit: MAX_CHAT_HISTORY_LIMIT });
+    // Get messages with the provided message limit
+    const messages = await client.getMessages(entity, { limit: messageLimit });
 
     return messages
       .filter(message => message.message)
@@ -250,7 +257,10 @@ bot.help(ctx => {
       '/start - Start the bot\n' +
       '/help - Show this help message\n' +
       '/list - List all your chats, channels and groups\n' +
-      `/summarize [group_link_or_id] - Summarize the last ${MAX_CHAT_HISTORY_HOURS} hours or last ${MAX_CHAT_HISTORY_LIMIT} messages of chat in the specified group`
+      '/summarize [group_link_or_id] [hours] [message_limit] - Summarize chat history\n' +
+      '  - group_link_or_id: Required. The group to summarize\n' +
+      `  - hours: Optional. How far back to look (default: ${MAX_CHAT_HISTORY_HOURS})\n` +
+      `  - message_limit: Optional. Maximum messages to fetch (default: ${MAX_CHAT_HISTORY_LIMIT})`
   );
 });
 
@@ -297,7 +307,9 @@ bot.command('summarize', async ctx => {
   const args = ctx.message.text.split(' ').slice(1);
 
   if (!args.length) {
-    ctx.reply('Please provide a group link or ID. Usage: /summarize [group_link_or_id]');
+    ctx.reply(
+      'Please provide a group link or ID. Usage: /summarize [group_link_or_id] [hours] [message_limit]'
+    );
     return;
   }
 
@@ -307,6 +319,8 @@ bot.command('summarize', async ctx => {
   }
 
   const groupIdentifier = args[0];
+  const hours = args[1] ? parseInt(args[1], 10) : MAX_CHAT_HISTORY_HOURS;
+  const messageLimit = args[2] ? parseInt(args[2], 10) : MAX_CHAT_HISTORY_LIMIT;
 
   // Let the user know the bot is working
   ctx.reply(`Fetching and summarizing messages for ${groupIdentifier}. This may take a moment...`);
@@ -328,7 +342,7 @@ bot.command('summarize', async ctx => {
 
     // Send summary to the user
     ctx.reply(
-      `Summary of the last ${MAX_CHAT_HISTORY_HOURS} hours or last ${MAX_CHAT_HISTORY_LIMIT} messages in the group:\n\n${summary}`
+      `Summary of the last ${hours} hours or last ${messageLimit} messages in the group:\n\n${summary}`
     );
   } catch (error) {
     logger.error(`Error processing summarize command: ${error}`);
