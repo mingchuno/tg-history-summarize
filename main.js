@@ -296,7 +296,9 @@ bot.command('list', async ctx => {
     await ctx.reply(`${formattedMessage}${formattedChunk}`);
 
     // Add instructions for using the IDs
-    await ctx.reply('To summarize a chat, use /summarize [ID] with one of the IDs listed above.');
+    await ctx.reply(
+      'To summarize a chat, use /summarize [group_link_or_id] [hours] [message_limit] with one of the IDs listed above.'
+    );
   } catch (error) {
     logger.error(`Error processing list command: ${error}`);
     ctx.reply(`Error: ${error.message}`);
