@@ -205,6 +205,8 @@ async function summarizeText(messages) {
     return 'No messages found in the specified time period.';
   }
 
+  logger.info(`Summarizing ${messages.length} messages`);
+
   // Format messages for the prompt
   const formattedMessages = messages
     .map(msg => `${msg.date} - ${msg.sender}: ${msg.text}`)
@@ -225,7 +227,7 @@ async function summarizeText(messages) {
   try {
     // Get summary from OpenAI
     const response = await openai.chat.completions.create({
-      model: 'gpt-5', // Or any suitable model
+      model: 'gpt-5-mini', // Or any suitable model
       messages: [
         {
           role: 'developer',
