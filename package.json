@@ -16,24 +16,24 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "dotenv": "^16.4.7",
+    "dotenv": "^16.6.1",
     "input": "^1.0.1",
     "moment": "^2.30.1",
-    "openai": "^4.86.0",
-    "pino": "^9.6.0",
-    "pino-pretty": "^13.0.0",
+    "openai": "^4.104.0",
+    "pino": "^9.8.0",
+    "pino-pretty": "^13.1.1",
     "telegraf": "^4.16.3",
     "telegram": "^2.26.22"
   },
   "devDependencies": {
     "eslint": "^8.57.1",
-    "eslint-config-prettier": "^10.0.2",
+    "eslint-config-prettier": "^10.1.8",
     "eslint-config-standard": "^17.1.0",
-    "eslint-plugin-import": "^2.31.0",
+    "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-n": "^16.6.2",
-    "eslint-plugin-prettier": "^5.2.3",
+    "eslint-plugin-prettier": "^5.5.4",
     "eslint-plugin-promise": "^6.6.0",
-    "nodemon": "^3.1.9",
-    "prettier": "^3.5.2"
+    "nodemon": "^3.1.10",
+    "prettier": "^3.6.2"
   }
 }
