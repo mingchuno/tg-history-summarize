@@ -225,7 +225,7 @@ async function summarizeText(messages) {
   try {
     // Get summary from OpenAI
     const response = await openai.chat.completions.create({
-      model: 'gpt-4o', // Or any suitable model
+      model: 'gpt-5', // Or any suitable model
       messages: [
         {
           role: 'developer',
