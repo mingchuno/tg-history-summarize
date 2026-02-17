@@ -3,9 +3,10 @@ import { Telegraf } from 'telegraf';
 import { TelegramClient } from 'telegram';
 import { StringSession } from 'telegram/sessions/StringSession.js';
 import { OpenAI } from 'openai';
-import input from 'input';
 import moment from 'moment';
 import pino from 'pino';
+import { createInterface } from 'node:readline';
+import { stdin as processStdin, stdout as processStdout } from 'node:process';
 
 // Configure environment variables
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || 'your_bot_token_here';
@@ -48,12 +49,24 @@ const logger = pino({
  * Start the Telegram client
  */
 async function startTelegramClient() {
-  await client.start({
-    phoneNumber: async () => await input.text('Please enter your phone number: '),
-    password: async () => await input.text('Please enter your password: '),
-    phoneCode: async () => await input.text('Please enter the code you received: '),
-    onError: err => logger.error(`Error starting Telegram client: ${err}`),
-  });
+  const readline = createInterface({ input: processStdin, output: processStdout });
+  const ask = question =>
+    new Promise(resolve => {
+      readline.question(question, answer => {
+        resolve(answer.trim());
+      });
+    });
+
+  try {
+    await client.start({
+      phoneNumber: async () => await ask('Please enter your phone number: '),
+      password: async () => await ask('Please enter your password: '),
+      phoneCode: async () => await ask('Please enter the code you received: '),
+      onError: err => logger.error(`Error starting Telegram client: ${err}`),
+    });
+  } finally {
+    readline.close();
+  }
 
   // Save the session string to reuse it later
   // logger.info(`Session string: ${client.session.save()}`);
@@ -141,7 +154,7 @@ async function getChatHistory(
       let id;
       try {
         id = BigInt(groupIdentifier);
-      } catch (error) {
+      } catch {
         logger.error(`Invalid ID format: ${groupIdentifier}`);
         throw new Error(`Invalid ID format: ${groupIdentifier}. Please use a valid numeric ID.`);
       }
