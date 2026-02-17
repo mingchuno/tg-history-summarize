@@ -5,8 +5,6 @@ import { StringSession } from 'telegram/sessions/StringSession.js';
 import { OpenAI } from 'openai';
 import moment from 'moment';
 import pino from 'pino';
-import { createInterface } from 'node:readline';
-import { stdin as processStdin, stdout as processStdout } from 'node:process';
 
 // Configure environment variables
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || 'your_bot_token_here';
@@ -49,27 +47,29 @@ const logger = pino({
  * Start the Telegram client
  */
 async function startTelegramClient() {
-  const readline = createInterface({ input: processStdin, output: processStdout });
-  const ask = question =>
-    new Promise(resolve => {
-      readline.question(question, answer => {
-        resolve(answer.trim());
-      });
-    });
-
-  try {
-    await client.start({
-      phoneNumber: async () => await ask('Please enter your phone number: '),
-      password: async () => await ask('Please enter your password: '),
-      phoneCode: async () => await ask('Please enter the code you received: '),
-      onError: err => logger.error(`Error starting Telegram client: ${err}`),
-    });
-  } finally {
-    readline.close();
+  if (!SESSION_STRING) {
+    throw new Error(
+      'SESSION_STRING is required for non-interactive server startup. Provide it through .env.'
+    );
   }
 
-  // Save the session string to reuse it later
-  // logger.info(`Session string: ${client.session.save()}`);
+  await client.connect();
+
+  const isAuthorized = await client.checkAuthorization();
+  if (!isAuthorized) {
+    throw new Error(
+      'Telegram client is not authorized. Ensure SESSION_STRING contains a valid authenticated session.'
+    );
+  }
+
+  const me = await client.getMe();
+  logger.info(
+    {
+      telegramUserId: me.id.toString(),
+      telegramUsername: me.username || null,
+    },
+    'Telegram session authorized'
+  );
 }
 
 /**
@@ -373,7 +373,7 @@ async function main() {
     // Start the Telegram client
     await startTelegramClient();
 
-    // Log out the session string to save it
+    // Telegram client is connected using the provided session string
     logger.info('Telegram client started');
 
     // Launch the bot
